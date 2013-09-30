@@ -7,6 +7,7 @@
 -export([string/1, file/1]).
 -export([eval/1]).
 -export([i/1]).
+-export([pretty_print/1]).
 
 -type ast() :: term().
 
@@ -36,7 +37,60 @@ i(String) ->
   tcache:stop(),
   Res.
 
+-spec pretty_print (AST::ast()) -> {ok, TeaCode::string()} | {error, term()}.
+pretty_print (AST) ->
+    pp(AST, 0).
+
 %% Internals
+
+s (N) -> string:chars($ , 2 * N).   %% Prepend spaces (Tab width * N).
+es (T) -> [S] = io_lib:format("~p",[T]), S.   %% Ensure T is string().
+
+pp ({wherevar, TopExpr, VarDecls}, N) ->
+    s(N) ++ pp(TopExpr, N) ++ "\n" ++
+    s(N) ++ "wherevar"        "\n" ++
+    s(N +1) ++ pp(VarDecls, N +1)  ++
+    s(N) ++ "end"             "\n";
+pp ({wheredim, Vars, DimDecls}, N) ->
+    s(N) ++ pp(Vars, N)    ++ "\n" ++
+    s(N) ++ "wheredim"        "\n" ++
+    s(N +1) ++ pp(DimDecls, N +1)  ++
+    s(N) ++ "end"             "\n";
+pp ({'if', Cond, Then, Else}, N) ->
+    s(N) ++ "if"                 "\n" ++
+    s(N +1) ++ pp(Cond, N +1) ++ "\n" ++
+    s(N) ++ "then"               "\n" ++
+    s(N +1) ++ pp(Then, N +1) ++ "\n" ++
+    s(N) ++ "else"               "\n" ++
+    s(N +1) ++ pp(Else, N +1) ++ "\n" ++
+    s(N) ++ "fi"                 "\n";
+pp ({'#', Dim}, N) ->
+    " #."++ pp(Dim, N) ++" ";
+pp ({[_],  Dim}, N) -> %% Dimensions
+    es(Dim);
+pp ({t, Assocs}, N) -> %% Tuples
+    s(N) ++ " ["++ string:join([pp(Assoc,N) || Assoc <- Assocs], ", ") ++"] ";
+pp ({primop, Fun, [Lhs,Rhs]}, N) ->
+    " " ++ pp(Lhs, N) ++ " " ++
+    case Fun of
+        Mod when Mod == (fun mod/2) ->
+            " % ";
+        fun erlang:Op/2 ->
+            F = case Op of
+                '=<' -> '<=';
+                '=/=' -> '!=';
+                Op -> Op
+            end,
+            atom_to_list(F)
+    end ++
+    " " ++ pp(Rhs, N) ++ " ";
+pp ({{[_],_}=Dim, Init}, N) -> %% DimDecls
+    s(N) ++ "dim "++ pp(Dim) ++" <- "++ pp(Init, N) ++ "\n";
+pp ({Var, Expr}, N) -> %% VarDecls
+    s(N) ++ "var "++ es(Var)  ++ " = " "\n" ++
+    s(N +1) ++ pp(Expr, N +1) ++       "\n";
+pp (Rest, _) ->
+    es(Rest).
 
 rework_tree (Tree) ->
     V = fun
