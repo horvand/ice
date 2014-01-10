@@ -10,9 +10,11 @@
         ?_assertError(
            {badmatch, {error, undefined_identifier, VarId}},
            eval(SOrT))).
--define(_assertUndefVarIdMockingIcePar(VarId, SOrT),
-        {setup, fun mock_ice_par/0, fun(_) -> unmock_ice_par() end,
+
+-define(_assertUndefVarIdMockingIceCtl(VarId, SOrT),
+        {setup, fun mock_ice_ctl/0, fun(_) -> unmock_ice_ctl() end,
          ?_assertUndefVarId(VarId, SOrT)}).
+
 -define(_assertUndefVarIdMockingIcePrimopEval(VarId, MockArgs, SOrT),
         {setup,
          fun() -> mock_ice_primop_eval(MockArgs) end,
@@ -77,9 +79,9 @@ tests_w_b_abs_from_various_expressions(A=_UndefVarIdA, T=_ASTGenF) ->
       {'primop_identity', fun(X) -> X end},
       T({primop, 'primop_identity', [BAbs]})),
    %%
-   ?_assertUndefVarIdMockingIcePar(A, T(s("#.t @ [t <- \\.x -> A]"))),
+   ?_assertUndefVarIdMockingIceCtl(A, T(s("#.t @ [t <- \\.x -> A]"))),
    %%
-   ?_assertUndefVarIdMockingIcePar(
+   ?_assertUndefVarIdMockingIceCtl(
       A,
       T(s("(\\.x -> 1) // A harmless b_abs, just for returning one
             @ [
@@ -123,15 +125,15 @@ tests_w_b_abs_from_various_expressions(A=_UndefVarIdA, T=_ASTGenF) ->
 
 %% Internals - Mocking
 
-mock_ice_par() ->
-  ok = meck:new(ice_par, [passthrough]),
-  ok = meck:expect(ice_par, eval,
+mock_ice_ctl() ->
+  ok = meck:new(ice_ctl, [passthrough]),
+  ok = meck:expect(ice_ctl, eval_par,
                    fun(Xs, I, E, K, D, W, T) ->
-                       ice_par:eval_seq(Xs, I, E, K, D, W, T)
+                       ice_ctl:eval_seq(Xs, I, E, K, D, W, T)
                    end).
 
-unmock_ice_par() ->
-  ok = meck:unload(ice_par).
+unmock_ice_ctl() ->
+  ok = meck:unload(ice_ctl).
 
 mock_ice_primop_eval({MockedOp, F}) ->
   ok = meck:new(ice_primop_eval, [passthrough, non_strict]),

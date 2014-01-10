@@ -6,8 +6,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--define(_testMockingIcePar(Expr),
-        {setup, fun mock_ice_par/0, fun(_) -> unmock_ice_par() end,
+-define(_testMockingIceCtl(Expr),
+        {setup, fun mock_ice_ctl/0, fun(_) -> unmock_ice_ctl() end,
          ?_test(Expr)}).
 
 
@@ -35,10 +35,10 @@ dim_id_must_be_declared_before_being_queried_test_() ->
   {foreach, fun setup/0, fun cleanup/1,
    [
     ?_assertError(UndefIdD, eval("#.d")), %% Upstream TL returns spdim
-    ?_testMockingIcePar(
+    ?_testMockingIceCtl(
        ?assertError(
           UndefIdD, eval("[d <- 0]"))), %% Upstream TL returns spundef
-    ?_testMockingIcePar(
+    ?_testMockingIceCtl(
        ?assertError(
           UndefIdD, eval("#.d @ [d <- 0]"))), %% Upstream TL returns spundef
     %%
@@ -125,9 +125,9 @@ lexical_scoping_between_dim_id_and_formal_param_test_() ->
     ?_assertMatch(
        {[46],_}, %% Upstream TL returns spdim
        eval("(F.46 where fun F.x =     #.x end) where dim x <- 1 end")),
-    ?_testMockingIcePar(
+    ?_testMockingIceCtl(
        ?assertError(
-          badarith, %% Upstream TL returns spundef %% TODO Improve semantics, as ice_par:eval in evaluation of primop returns [46, [46]], but [46] is not recognized as a dimension by ice_sets:is_d
+          badarith, %% Upstream TL returns spundef %% TODO Improve semantics, as ice_ctl:eval_par in evaluation of primop returns [46, [46]], but [46] is not recognized as a dimension by ice_sets:is_d
           eval("(F.46 where fun F.x = x + #.x end) where dim x <- 1 end"))),
     %%
     ?_assertMatch(
@@ -136,9 +136,9 @@ lexical_scoping_between_dim_id_and_formal_param_test_() ->
     ?_assertMatch(
        {{dim,_,"x"},_}, %% Upstream TL returns 'unknown typename"I don\'t know how to print this type"' %% TODO Consider masking as maybe dimension shall not be returned
        eval("F.1 where fun F.x =  x        where dim x <- 46 end end")),
-    ?_testMockingIcePar(
+    ?_testMockingIceCtl(
        ?assertError(
-          badarith, %% Upstream TL returns spundef %% TODO Improve semantics, as ice_par:eval in evaluation of primop returns [46, [46]], but [46] is not recognized as a dimension by ice_sets:is_d
+          badarith, %% Upstream TL returns spundef %% TODO Improve semantics, as ice_ctl:eval_par in evaluation of primop returns [46, [46]], but [46] is not recognized as a dimension by ice_sets:is_d
           eval("F.1 where fun F.x = (x + #.x) where dim x <- 46 end end")))
    ]}.
 
@@ -362,15 +362,15 @@ var_redefined_in_nested_wherevar_is_shadowed_by_outer_if_outer_already_queried()
 
 %% Internals - Mocking
 
-mock_ice_par() ->
-  ok = meck:new(ice_par, [passthrough]),
-  ok = meck:expect(ice_par, eval,
+mock_ice_ctl() ->
+  ok = meck:new(ice_ctl, [passthrough]),
+  ok = meck:expect(ice_ctl, eval_par,
                    fun(Xs, I, E, K, D, W, T) ->
-                       ice_par:eval_seq(Xs, I, E, K, D, W, T)
+                       ice_ctl:eval_seq(Xs, I, E, K, D, W, T)
                    end).
 
-unmock_ice_par() ->
-  ok = meck:unload(ice_par).
+unmock_ice_ctl() ->
+  ok = meck:unload(ice_ctl).
 
 %% Internals
 
