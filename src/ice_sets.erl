@@ -2,9 +2,9 @@
 
 -export([intersection/2, difference/2]).
 -export([restrict/2, union/2, restrict_domain/2]).
--export([subset/2, domain/1, is_d/1, is_k/1]).
+-export([subset/2, domain/1, is_known_dimension/1, is_context/1]).
 -export([subtract/2, subtract_domain/2, subtract_by_domain/2]).
--export([perturb/2, union_d/1]).
+-export([perturb/2, dim_union/1]).
 -export([identical/2]).
 
 %%-------------------------------------------------------------------------------------
@@ -65,22 +65,22 @@ union(A, B) ->
 %%-------------------------------------------------------------------------------------
 %% @doc The union of sets in Dis where if Di is a set of known dimensions, Ui MaxI
 %%-------------------------------------------------------------------------------------
-union_d(Dis) ->
+dim_union(Dis) ->
   case lists:any(fun ice_sets:is_k/1, Dis) of
     true ->
-      {true, union_d(Dis, [])};
+      {true, dim_union(Dis, [])};
     false ->
       {false, Dis}
   end.
 
-union_d([], UDis) ->
+dim_union([], UDis) ->
   UDis;
-union_d([Di|Dis], UDis) ->
-  case is_k(Di) of
+dim_union([Di|Dis], UDis) ->
+  case is_context(Di) of
     true ->
-      union_d(Dis, union(Di, UDis));
+      dim_union(Dis, union(Di, UDis));
     false ->
-      union_d(Dis, UDis)
+      dim_union(Dis, UDis)
   end.
 
 %%-------------------------------------------------------------------------------------
@@ -107,14 +107,16 @@ identical(A,B) ->
 %%-------------------------------------------------------------------------------------
 %% @doc Check whether A is a set of known dimensions
 %%-------------------------------------------------------------------------------------
-is_d({dim, {_Pos,_Idx}, A}) when is_list(A) orelse is_atom(A) ->
+is_known_dimension({dim, {_Pos,_Idx}, A}) when is_list(A) orelse is_atom(A) ->
   true;
-is_d({phi, A}) when is_list(A) orelse is_atom(A) ->
+is_known_dimension({phi, A}) when is_list(A) orelse is_atom(A) ->
   true;
-is_d(_) ->
+is_known_dimension(_) ->
   false.
 
-is_k(A) when is_list(A) ->
-  lists:any(fun (X) -> is_d(X) end, A); %% XXX Why any and not all?
-is_k(_) ->
+is_context(A) when is_list(A) ->
+  %% Use of any here since any 'known dimension' within a context means that there
+  %% is possibly a missing dimension ? Verify semantics of this form
+  lists:any(fun (X) -> is_known_dimension(X) end, A);
+is_context(_) ->
   false.
