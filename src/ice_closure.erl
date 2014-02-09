@@ -66,8 +66,8 @@ close_shallowest_abs({primop, F, Eis}, I, E) ->
   %% If primop were not able to return one of its arguments when an
   %% abstraction, there would be no need to close arguments.
   {primop, F, lists:map(fun(Ei) -> close_shallowest_abs(Ei, I, E) end, Eis)};
-close_shallowest_abs({t, Es}, I, E) ->
-  {t, lists:map(
+close_shallowest_abs({tuple, Es}, I, E) ->
+  {tuple, lists:map(
         fun({Xi,Ei}) ->
             {close_shallowest_abs(Xi, I, E),
              close_shallowest_abs(Ei, I, E)}
@@ -84,17 +84,17 @@ close_shallowest_abs({Q, _E0}=Expr, _I, _E) when Q == '#' orelse Q == '?' ->
   %% nothing to be closed over the environment.
   Expr;
 close_shallowest_abs({b_abs, _Is, _Params, _E0}=Abs, I, E) ->
-  close_abs(Abs, I, E);
+  Abs;
 close_shallowest_abs({b_apply, E0, Eis}, I, E) ->
   {b_apply, close_shallowest_abs(E0, I, E),
    lists:map(fun(Ei) -> close_shallowest_abs(Ei, I, E) end, Eis)};
 close_shallowest_abs({v_abs, _Is, _Params, _E0}=Abs, I, E) ->
-  close_abs(Abs, I, E);
+  Abs;
 close_shallowest_abs({v_apply, E0, Eis}, I, E) ->
   {v_apply, close_shallowest_abs(E0, I, E),
    lists:map(fun(Ei) -> close_shallowest_abs(Ei, I, E) end, Eis)};
 close_shallowest_abs({i_abs, _Is,          _E0}=Abs, I, E) ->
-  close_abs(Abs, I, E);
+  Abs;
 close_shallowest_abs({i_apply, E0     }, I, E) ->
   {i_apply, close_shallowest_abs(E0, I, E)};
 close_shallowest_abs({closure, _ClI, _ClE, _Abs}=Expr, _I, _E) ->
