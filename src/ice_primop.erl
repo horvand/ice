@@ -10,6 +10,7 @@
 -export(['not'/1, 'and'/2, 'or'/2]).
 
 -export([floor/1, ceil/1]).
+-export([fib/1]).
 -export([abs/1]).
 
 -export([plus/1, minus/1]).
@@ -52,6 +53,7 @@
 
 ?OP1(floor).
 ?OP1(ceil).
+?OP1(fib).
 ?OP1(abs).
 
 ?OP1(plus, '+').

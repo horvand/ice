@@ -10,6 +10,8 @@
 -export(['not'/1, 'and'/2, 'or'/2]).
 
 -export([floor/1, ceil/1]).
+-export([fib/1]).
+
 -export([abs/1]).
 
 -export(['+'/1, '-'/1]).
@@ -61,6 +63,7 @@ floor(A) ->
     0 -> T;
     _ -> T - 1
   end.
+
 %% https://erlangcentral.org/wiki/index.php/Floating_Point_Rounding
 ceil(A) when A < 0 ->
   trunc(A);
@@ -70,6 +73,12 @@ ceil(A) ->
     0 -> T;
     _ -> T + 1
   end.
+
+fib(N) when N =< 1 ->
+  N;
+fib(N) ->
+  fib(N - 1) + fib(N - 2).
+
 ?E1(abs).
 
 ?E1('+').
