@@ -9,7 +9,7 @@ eval_seq(Exps, I, E, K, D, W) ->
   eval_seq(Exps, I, E, K, D, W, []).
 
 eval_seq([], I, E, K, D, W, Acc) ->
-  hd(Acc);
+  lists:reverse(Acc);
 eval_seq([Exp|Exps], I, E, K, D, W, Acc) ->
   Di = eval(Exp, I, E, K, D, W),
   %% Fixme: Check missing dimensions before progressing?
@@ -18,17 +18,35 @@ eval_seq([Exp|Exps], I, E, K, D, W, Acc) ->
 %%------------------------------------------------------------------------------
 %% @doc Evaluates a sequence of expressions in parallel
 %%------------------------------------------------------------------------------
-eval_par(Xs, I, E, K, D, W, T) ->
+eval_par(Xs, I, E, K, D, W) ->
   Lim = length(Xs),
   %%------------------------------------------------------------------------------
   %% Note: Passing self() here means W is self()
   %%------------------------------------------------------------------------------
   Pids = ice_thread:spawn_n(W, Lim),
-  ice_thread:join(Pids, Xs, I, E, K, D, W, T).
+  ice_thread:join(Pids, Xs, I, E, K, D, W).
 
 %%------------------------------------------------------------------------------
 %% @doc Evaluates an expression
 %%------------------------------------------------------------------------------
+
+%% Evaluates literal constants
+eval({bool, true}, _I, _E, _K, _D, _W) ->
+  true;
+eval({bool, false}, _I, _E, _K, _D, _W) ->
+  false;
+
+eval({char, Char}, _I, _E, _K, _D, _W) ->
+  Char;
+
+eval({int, Int}, _I, _E, _K, _D, _W) ->
+  Int;
+
+eval({float, Float}, _I, _E, _K, _D, _W) ->
+  Float;
+
+eval({string, String}, _I, _E, _K, _D, _W) ->
+  String;
 
 %% Evaluates a primitive operation
 eval({primop, F, Eis}, I, E, K, D, W) ->
@@ -57,7 +75,7 @@ eval({'@', E0, E1}, I, E, K, D, W) ->
   Di0 = eval(E1, I, E, K, D, W),
   case ice_sets:is_context(Di0) of
     true ->
-      lists:filter(fun ice_sets:is_domain/1, Di0);
+      lists:filter(fun ice_sets:is_known_dimension/1, Di0);
     false ->
       {tuple, Di1} = Di0,
       Ki  = ice_sets:perturb(K, Di1),
@@ -114,17 +132,17 @@ eval({phi, Xi} = Di, _I, _E, _K, _D, _W)
   Di;
 
 %% Evaluates a wherevar clause
-eval({wherevar, E0, XiEis}, I, E, K, D, W, T) ->
+eval({wherevar, E0, XiEis}, I, E, K, D, W) ->
   %% Close shallowest abstractions in new expressions in environment
   %% if needed. Wherevar is the only expression changing the
   %% environment, therefore the only one needing to do this.
   XiClEis = ice_closure:close_shallowest_abs_in_wherevar_expressions(XiEis, I, E),
-  eval(E0, I, ice_sets:perturb(E, XiClEis), K, D, W, T);
+  eval(E0, I, ice_sets:perturb(E, XiClEis), K, D, W);
 
 %% Evaluates a wheredim clause
-eval({wheredim, E0, XiEis}, I, E, K, D, W, T) ->
+eval({wheredim, E0, XiEis}, I, E, K, D, W) ->
   {Xis, Eis} = lists:unzip(XiEis),
-  Dis = eval_par(Eis, I, E, K, D, W, T),
+  Dis = eval_par(Eis, I, E, K, D, W),
   case ice_sets:dim_union(Dis) of
     {true, Dims} ->
       Dims;
@@ -139,7 +157,7 @@ eval({wheredim, E0, XiEis}, I, E, K, D, W, T) ->
       %% 2013, needs this correction re Delta) otherwise the body
       %% cannot use them.
       Di1 = ice_sets:union(D, Xis),
-      eval(E0, I, E, Ki1, Di1, W, MaxT)
+      eval(E0, I, E, Ki1, Di1, W)
   end;
 
 %% Evaluates a base abstraction
@@ -149,7 +167,7 @@ eval({b_abs, _Is, _Params, _E0} = Abs, I, E, K, D, W) ->
 %% Evaluates a base application
 eval({b_apply, E0, Eis}, I, E, K0, D, W) ->
   Di0_Dis = eval_par([E0|Eis], I, E, K0, D, W),
-  case ice_sets:dim_union(Dis) of
+  case ice_sets:dim_union(Di0_Dis) of
     {true, Dims} ->
       Dims;
     {false, Di0_Dis} ->
@@ -166,8 +184,8 @@ eval({v_abs, _Is, _Params, _E0} = Abs, I, E, K, D, W) ->
 
 %% Evaluates a value application
 eval({v_apply, E0, Eis}, I, E, K0, D0, W) ->
-  Di0_Dis = par_eval([E0|Eis], I, E, K0, D0, W),
-  case ice_sets:dim_union(Dis) of
+  Di0_Dis = eval_par([E0|Eis], I, E, K0, D0, W),
+  case ice_sets:dim_union(Di0_Dis) of
     {true, Dims} ->
       Dims;
     {false, Di0_Dis} ->
@@ -200,7 +218,7 @@ eval({i_apply, E0}, I, E, K0, D0, W) ->
 %% Evaluates a lambda expression
 
 %% Evaluates a variable identifier
-eval(Xi, I, E, K, D, W, T) when is_list(Xi) orelse is_atom(Xi) ->
+eval(Xi, I, E, K, D, W) when is_list(Xi) orelse is_atom(Xi) ->
   %% This rule differs from the one described in the Feb 2013 cache
   %% semantics paper in order to avooid to return a calc value in case
   %% of GC concurrent with the invocation of beta.find().
@@ -222,40 +240,40 @@ eval(Xi, I, E, K, D, W, T) when is_list(Xi) orelse is_atom(Xi) ->
   %% beta.data(x,k) is not defined, *no calc<w> node shall be
   %% created*. Probably, GC shall be triggered by this instruction
   %% too.
-  Di = eval1(Xi, I, E, ice_sets:restrict_domain(K, D), [], W, T).
+  Di = eval1(Xi, I, E, ice_sets:restrict_domain(K, D), [], W).
 
 %%---------------------------------------------------------------------------------
 %% Finding identifiers in the cache
 %%---------------------------------------------------------------------------------
-eval1(Xi, I, E, K, D, W, T) ->
-  {D0, T0} = eval2(Xi, I, E, K, D, W, T),
-  case ice_sets:is_k(D0) andalso ice_sets:subset(D0, ice_sets:domain(K)) of
+eval1(Xi, I, E, K, D, W) ->
+  Di = eval2(Xi, I, E, K, D, W),
+  case ice_sets:is_context(Di) andalso ice_sets:subset(Di, ice_sets:domain(K)) of
     true ->
-      case ice_sets:difference(D0, D) of
+      case ice_sets:difference(Di, D) of
         [] ->
-          {error, loop_detected, {already_known_dimensions, D0}};
+          {error, loop_detected, {known_dimensions, Di}};
         _ ->
-          eval1(Xi, I, E, K, ice_sets:union(D, D0), W, T)
+          eval1(Xi, I, E, K, ice_sets:union(D, Di), W)
       end;
     false ->
-      {D0, T0}
+      Di
   end.
 
-eval2(Xi, I, E, K, D, W, T) ->
-  {D0, T0} = ice_cache:find(Xi, K, D, W, T),
-  case D0 of
+eval2(Xi, I, E, K, D, W) ->
+  Di0 = ice_cache:find(Xi, K, D, W), 
+  case Di0 of
     {calc, W} ->
       case lists:keyfind(Xi, 1, E) of
         {_, E0} ->
-          {D1, T1} = eval(E0, I, E, K, D, W, T0),
-          ice_cache:add(Xi, K, D, W, T1, D1);
+          Di1 = eval(E0, I, E, K, D, W),
+          ice_cache:add(Xi, K, D, W, Di1);
         false ->
           {error, undefined_identifier, Xi}
       end;
     {calc, _W1} ->
-      eval2(Xi, I, E, K, D, W, T0 + 1);
+      eval2(Xi, I, E, K, D, W);
     _ ->
-      {D0, T0}
+      Di0
   end.
 
 %%------------------------------------------------------------------------------
@@ -304,15 +322,15 @@ even_elems([_|L], N, Acc) ->
 %%------------------------------------------------------------------------------
 freeze(Abs, I, E, K, D, W) ->
   Is = abs_intensions(Abs),
-  Dis0 = eval_par(Is, I, E, K, D, W),
+  Dis = eval_par(Is, I, E, K, D, W),
   case ice_sets:dim_union(Dis) of
     {true, Dims0} ->
       Dims0;
-    {false, Dis1} ->
-      case ice_sets:difference(Dis1, D) of
+    {false, Dis} ->
+      case ice_sets:difference(Dis, D) of
 	[] ->
 	  KD = ice_sets:restrict_domain(K, D),
-	  FrozenK = ice_sets:restrict_domain(KD, Dis1),
+	  FrozenK = ice_sets:restrict_domain(KD, Dis),
 	  freeze_abs(Abs, I, E, FrozenK);
 	Dims1 ->
 	  Dims1
@@ -326,7 +344,7 @@ freeze_abs({b_abs, _Is, Params, E0}, ClI, ClE, FrozenK) ->
   {b_abs, ClI, ClE, FrozenK, Params, E0};
 freeze_abs({v_abs, _Is, Params, E0}, ClI, ClE, FrozenK) ->
   {v_abs, ClI, ClE, FrozenK, Params, E0};
-freeze_abs({i_abs, _Is, E0}, FrozenK) ->
+freeze_abs({i_abs, _Is, E0}, ClI, ClE, FrozenK) ->
   {i_abs, ClI, ClE, FrozenK, E0}.
 
 %%------------------------------------------------------------------------------
