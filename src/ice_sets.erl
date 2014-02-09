@@ -66,7 +66,7 @@ union(A, B) ->
 %% @doc The union of sets in Dis where if Di is a set of known dimensions, Ui MaxI
 %%-------------------------------------------------------------------------------------
 dim_union(Dis) ->
-  case lists:any(fun ice_sets:is_k/1, Dis) of
+  case lists:any(fun ice_sets:is_context/1, Dis) of
     true ->
       {true, dim_union(Dis, [])};
     false ->
