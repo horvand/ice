@@ -26,7 +26,7 @@ file(Filename) ->
 eval(T) ->
   T0 = ice_trans0:transform0(T),
   T1 = ice_trans1:transform1(T0),
-  ice_core:eval(T1,[],[],[],[],{[],self()},0).
+  ice_runtime:eval(T1,[],[],[],[],{[],self()}).
 
 -spec i(string()) -> term().
 i(String) ->
@@ -80,7 +80,7 @@ rework_tree (Tree) ->
 	({';', _, X, Y}) ->
 	  {seq, X, Y};
 
-        ({tuple, _, Assocs}) -> {t, Assocs};
+        ({tuple, _, Assocs}) -> {tuple, Assocs};
         ({tuple_element, _, Lhs, Rhs}) -> {Lhs, Rhs};
 
         ({'==',  _, A, B}) -> ice_primop:eq(A, B);
