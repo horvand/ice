@@ -4,7 +4,10 @@
 
 time_f(Filename) ->
   T1 = erlang:now(),
-  ice:f(Filename),
+  R = ice:f(Filename),
   T2 = erlang:now(),
-  io:format("Time taken: ~p~n", [timer:now_diff(T2, T1) / 1000000]).
+  io:format("Time taken: ~p~n", [timer:now_diff(T2, T1) / 1000000]),
+  R.
+
+
   
