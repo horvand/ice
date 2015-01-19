@@ -1,46 +1,63 @@
 -module(ice_shell).
 -export([start/0]).
 
+-record(state, {prompt= "", cache = clear, defs = []}).
+
 start() ->
     error_logger:tty(false),
-    loop([]).
+    Prompt = case io:columns() of
+       {ok, _} -> "ICE> ";
+       {error, enotsup} -> ""
+    end,
+    loop(#state{prompt = Prompt}).
 
-loop(Defs) ->
-    case io:get_line("ICE> ") of
+loop(#state{prompt = P} = S) ->
+    case io:get_line(P) of
         eof -> init:stop();
         {error, _} -> init:stop();
         Line ->
-            do_line(Line, Defs)
+            do_line(Line, S)
     end.
 
-do_line(L, Defs) ->
+do_line(L, #state{defs = Defs, cache = C} = S) ->
     case check_line(L) of
         empty ->
-            loop(Defs);
+            loop(S);
         {def, {Name, _} = D} ->
             NewDefs = lists:keystore(Name, 1, Defs, D),
-            loop(NewDefs);
+            loop(#state{defs = NewDefs});
         {query, Q} ->
             Query = Q ++ where_defs(Defs),
             try
-                io:format("~p\n", [ice:i(Query)])
-            catch _:E ->
-                io:format("*** ~p in ~s", [E, Query]),
-                catch mnesia:stop() %% yuck!
-            end,
-            loop(Defs);
+		{Res, _} = eval(Query, C),
+                io:format("~p\n", [Res]),
+                loop(S)
+            catch Class:Err ->
+                io:format("*** ~p:~p in ~s\n~p\n", [Class,Err, Query, erlang:get_stacktrace()]),
+                catch ice_cache:delete(),
+                loop(S#state{cache = clear})
+            end;
         {command, d} ->
-            loop([]);
+            loop(S#state{defs = []});
         {command, q} ->
             init:stop();
         {command, p} ->
             print(Defs),
-            loop(Defs);
+            loop(S);
         {command, {l, Name}} ->
-            loop(load(Name, Defs));
-        {badcommand, C} ->
+            loop(S#state{defs = load(Name, Defs)});
+        {command, cache_on} ->
+            ice_cache:create(),
+            loop(S#state{cache = keep});
+        {command, cache_off} ->
+             ice_cache:delete(),
+            loop(S#state{cache = clear});
+        {command, print_cache_state} ->
+            io:format("***cache ~p\n", [C]),
+            loop(S);
+         {badcommand, C} ->
             io:format("*** Bad command: `~s'\n", [C]),
-            loop(Defs)
+            loop(S)
     end.
 
 check_line(S) ->
@@ -59,6 +76,15 @@ check_command(S) ->
             {command, p};
         {match, ["q", ""]} ->
             {command, q};
+        {match, ["c", OnOff]} ->
+            case string:strip(OnOff) of
+                "on"++ _ ->
+                    {command, cache_on};
+                 "off" ++ _ ->
+                     {command, cache_off};
+                 _ ->
+                     {command, print_cache_state}
+             end;
         {match, ["l", File]} ->
             {command, {l, File}};
         {match, [C|_]} ->
@@ -103,3 +129,15 @@ where_defs(Defs) ->
 print(Defs) ->
     [io:format("~s", [Def]) || {_Name, Def} <- Defs],
     ok.
+
+eval(String, C) ->
+    Tree = ice_string:parse(String),
+    case C of
+              clear ->
+                  ice_cache:create(),
+                  Res = ice:eval(Tree),
+                  ice_cache:delete(),
+                  Res;
+              keep ->
+                  ice:eval(Tree)
+              end.
