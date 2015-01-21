@@ -23,11 +23,10 @@ RawString    = (`[^`]*`)
 CookedString = ("(\\([^\\]|\\)|[^\\""])+")
 
 %% Misc
-LeftwardsArrow  = (<-|←)
-RightwardsArrow = (->|→)
+LeftwardsArrow  = (<-)
+RightwardsArrow = (->)
 Equal           = (=)
-Lambda          = (\\|Λ|λ|ᴧ|Ⲗ|ⲗ|𝚲|𝛌|𝛬|𝜆|𝜦|𝝀|𝝠|𝝺|𝞚|𝞴)
-%% (from //en.wikipedia.org/wiki/Lambda#Character_Encodings)
+Lambda          = (\\)
 
 %% Parameter operators
 ParamDot  = (\.)
@@ -59,9 +58,9 @@ HashDot  = (#\.)
 HashBang = (#!)
 
 %% Intensionality
-UpwardsArrow   = (↑)
+%% UpwardsArrow   = (↑)
 CrIntensionKwd = (i\^)
-DownwardsArrow = (↓)
+%% DownwardsArrow = (↓)
 EvIntensionKwd = (i!)
 %% Extensionality
 Ext   = (ext)
