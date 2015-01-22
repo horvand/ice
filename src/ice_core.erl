@@ -33,7 +33,7 @@ eval({seq, E0, E1}, I, E, K, D, W, T) ->
 %% Primop
 %%-------------------------------------------------------------------------------------
 eval({primop, Primop, Eis}, I, E, K, D, W, T) ->
-  {Dis, MaxT} = ice_par:eval(Eis, I, E, K, D, W, T),
+  {Dis, MaxT} = ice_par:eval_seq(Eis, I, E, K, D, W, T),
   case ice_sets:union_d(Dis) of
     {true, Dims} ->
       {Dims, MaxT};
@@ -46,7 +46,7 @@ eval({primop, Primop, Eis}, I, E, K, D, W, T) ->
 %%-------------------------------------------------------------------------------------
 eval({t, Es}, I, E, K, D, W, T) ->
   XiEis = lists:flatmap(fun({Xi,Ei}) -> [Xi,Ei] end, Es),
-  {Dis, MaxT} = ice_par:eval(XiEis, I, E, K, D, W, T), %% XXX Does evaluating lhs make sense if dims are not ground values?
+  {Dis, MaxT} = ice_par:eval_seq(XiEis, I, E, K, D, W, T), %% XXX Does evaluating lhs make sense if dims are not ground values?
   case ice_sets:union_d(Dis) of
     {true, Dims} ->
       {Dims, MaxT};
@@ -119,7 +119,7 @@ eval({b_abs, _Is, _Params, _E0}=Abs, I, E, K, D, W, T) ->
   freeze_closure(ice_closure:close_abs(Abs, I, E), I, E, K, D, W, T);
 
 eval({b_apply, E0, Eis}, I, E, K, D, W, T) ->
-  {D0is, MaxT} = ice_par:eval([E0|Eis], I, E, K, D, W, T),
+  {D0is, MaxT} = ice_par:eval_seq([E0|Eis], I, E, K, D, W, T),
   case ice_sets:union_d(D0is) of
     {true, Dims} ->
       {Dims, MaxT};
@@ -140,7 +140,7 @@ eval({v_abs, _Is, _Params, _E0}=Abs, I, E, K, D, W, T) ->
   freeze_closure(ice_closure:close_abs(Abs, I, E), I, E, K, D, W, T);
 
 eval({v_apply, E0, Eis}, I, E, K, D, W, T) ->
-  {D0is, MaxT} = ice_par:eval([E0 | Eis], I, E, K, D, W, T),
+  {D0is, MaxT} = ice_par:eval_seq([E0 | Eis], I, E, K, D, W, T),
   case ice_sets:union_d(D0is) of
     {true, Dims} ->
       {Dims, MaxT};
@@ -193,7 +193,7 @@ eval({wherevar, E0, XiEis}, I, E, K, D, W, T) ->
 %%-------------------------------------------------------------------------------------
 eval({wheredim, E0, XiEis}, I, E, K, D, W, T) ->
   {Xis, Eis} = lists:unzip(XiEis),
-  {Dis, MaxT} = ice_par:eval(Eis, I, E, K, D, W, T),
+  {Dis, MaxT} = ice_par:eval_seq(Eis, I, E, K, D, W, T),
   case ice_sets:union_d(Dis) of
     {true, Dims} ->
       {Dims, MaxT};
@@ -338,7 +338,7 @@ even_elements([_|L], N, Acc) ->
 %%------------------------------------------------------------------------------
 freeze_closure({closure, _ClI, _ClE, Abs}=Cl, I, E, K, D, W, T) ->
   Is = frozen_expressions(Abs),
-  {Dis, MaxT} = ice_par:eval(Is, I, E, K, D, W, T),
+  {Dis, MaxT} = ice_par:eval_seq(Is, I, E, K, D, W, T),
   case ice_sets:union_d(Dis) of
     {true, Dims} ->
       {Dims, MaxT};
